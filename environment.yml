@@ -1,0 +1,25 @@
+name: spotify-analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - jupyter
+  - notebook
+  - nbconvert
+  - ipykernel
+  - pip
+  - pip:
+    - datasets  # <-- This line is essential!
+    - huggingface-hub
+    - myst-nb
+    - jupyter-book
+    - plotly
+    - scipy
+    - statsmodels
+    - pytest
