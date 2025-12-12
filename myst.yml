@@ -1,6 +1,6 @@
 # See docs at: https://mystmd.org/guide/frontmatter
 version: 1
-project:
+project: Stat 159 final project
   id: fc3cf777-9cbe-4ac1-89c2-6f00ab54ae7d
   title: Spotify Music Analysis
   description: Building a model to predict the popularity score of a song based on its features
