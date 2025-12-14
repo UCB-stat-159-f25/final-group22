@@ -15,8 +15,6 @@ dependencies:
   - ipykernel
   - pip
   - pip:
-    - datasets  # <-- This line is essential!
-    - huggingface-hub
     - myst-nb
     - jupyter-book
     - plotly

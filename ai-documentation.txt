@@ -1,0 +1,5 @@
+# AI Documentation
+
+## Project 3 Spotify Analysis
+
+### AI Interactions:
