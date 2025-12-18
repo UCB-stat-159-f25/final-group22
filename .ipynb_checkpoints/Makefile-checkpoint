@@ -1,0 +1,25 @@
+.PHONY: env all clean
+
+ENV_NAME = spotify-analysis
+NOTEBOOKS = $(wildcard *.ipynb)
+OUTPUT_DIR = output
+
+env: environment.yml
+	@if ! command -v conda &> /dev/null; then \
+		echo "Error: Conda not found"; \
+		exit 1; \
+	fi
+	@if conda env list | grep -q "^${ENV_NAME}\s"; then \
+		conda env update -n $(ENV_NAME) -f environment.yml; \
+	else \
+		conda env create -f environment.yml; \
+	fi
+
+all: env
+	@mkdir -p $(OUTPUT_DIR)
+	@for nb in $(NOTEBOOKS); do \
+		conda run -n $(ENV_NAME) jupyter nbconvert --execute --to html --output-dir=$(OUTPUT_DIR) $$nb; \
+	done
+
+clean:
+	rm -rf $(OUTPUT_DIR)
