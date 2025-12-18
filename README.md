@@ -1,4 +1,5 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/sSkqmNLf)
+# Spotify Data Analysis
+
 In this project, we study whether a track’s quantitative audio features from Spotify (e.g., danceability, energy, loudness, acousticness, valence) can predict a song's popularity score (0–100). Our Spotify dataset is obtained from Kaggle and contains data on the aformentioned features on 114,000 tracks. We perform EDA on our features and build predictive models using multiple linear regression with LASSO and Ridge regularization. The optimal regularization parameter was found with K-fold CV and the best prediction model was determined through RMSE and CV error.
 
 Our repository contains the following files:
