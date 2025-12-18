@@ -1,0 +1,366 @@
+% Created with jtex v.1.0.20
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{datetime}
+\usepackage{graphicx}
+\usepackage{natbib}
+\bibliographystyle{abbrvnat}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%  imports  %%%%%%%%%%%%%%%%%%%
+\usepackage{booktabs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% colors for hyperlinks
+\hypersetup{colorlinks=true, allcolors=blue}
+
+\newcommand{\logo}{
+  \href{https://curvenote.com}{\includegraphics[width=2cm]{curvenote.png}}
+}
+
+\title{Exploratory Data Analysis}
+
+\author{Collins Tse \and Jacky Ke \and Rebecca Bachtra \and Christy Yau}
+
+\newdate{articleDate}{18}{12}{2025}
+\date{\displaydate{articleDate}}
+
+\begin{document}
+\maketitle
+\begin{center}\logo\end{center}
+
+
+\begin{verbatim}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+sns.set(style="whitegrid")
+plt.rcParams["figure.figsize"] = (10, 5)
+\end{verbatim}
+
+\begin{verbatim}
+df = pd.read_csv("data/processed/spotify_clean.csv")
+\end{verbatim}
+
+\begin{verbatim}
+df.head()
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}p{\dimexpr 0.045\linewidth-2\tabcolsep}}
+\toprule
+ & track\_id & artists & album\_name & track\_name & popularity & duration\_ms & explicit & danceability & energy & key & ... & mode & speechiness & acousticness & instrumentalness & liveness & valence & tempo & time\_signature & track\_genre & duration\_min \\
+\hline
+0 & 5SuOikwiRyPMVoIQDJUgSV & Gen Hoshino & Comedy & Comedy & 73 & 230666 & NaN & 0.676 & 0.4610 & 1 & ... & 0 & 0.1430 & 0.0322 & 0.000001 & 0.3580 & 0.715 & 87.917 & 4 & acoustic & 3.844433 \\
+\hline
+1 & 4qPNDBW1i3p13qLCt0Ki3A & Ben Woodward & Ghost (Acoustic) & Ghost - Acoustic & 55 & 149610 & NaN & 0.420 & 0.1660 & 1 & ... & 1 & 0.0763 & 0.9240 & 0.000006 & 0.1010 & 0.267 & 77.489 & 4 & acoustic & 2.493500 \\
+\hline
+2 & 1iJBSr7s7jYXzM8EGcbK5b & Ingrid Michaelson;ZAYN & To Begin Again & To Begin Again & 57 & 210826 & NaN & 0.438 & 0.3590 & 0 & ... & 1 & 0.0557 & 0.2100 & 0.000000 & 0.1170 & 0.120 & 76.332 & 4 & acoustic & 3.513767 \\
+\hline
+3 & 6lfxq3CG4xtTiEg7opyCyx & Kina Grannis & Crazy Rich Asians (Original Motion Picture Sou... & Can't Help Falling In Love & 71 & 201933 & NaN & 0.266 & 0.0596 & 0 & ... & 1 & 0.0363 & 0.9050 & 0.000071 & 0.1320 & 0.143 & 181.740 & 3 & acoustic & 3.365550 \\
+\hline
+4 & 5vjLSffimiIP26QG5WcN2K & Chord Overstreet & Hold On & Hold On & 82 & 198853 & NaN & 0.618 & 0.4430 & 2 & ... & 1 & 0.0526 & 0.4690 & 0.000000 & 0.0829 & 0.167 & 119.949 & 4 & acoustic & 3.314217 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+5 rows $\times$ 21 columns
+
+\begin{verbatim}
+print("Shape:", df.shape)
+df.info()
+\end{verbatim}
+
+\begin{verbatim}
+Shape: (89741, 21)
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 89741 entries, 0 to 89740
+Data columns (total 21 columns):
+ #   Column            Non -Null Count  Dtype  
+ - - -  - - - - - -            - - - - - - - - - - - - - -  - - - - -  
+ 0   track_id          89741 non -null  object 
+ 1   artists           89740 non -null  object 
+ 2   album_name        89740 non -null  object 
+ 3   track_name        89740 non -null  object 
+ 4   popularity        89741 non -null  int64  
+ 5   duration_ms       89741 non -null  int64  
+ 6   explicit          0 non -null      float64
+ 7   danceability      89741 non -null  float64
+ 8   energy            89741 non -null  float64
+ 9   key               89741 non -null  int64  
+ 10  loudness          89741 non -null  float64
+ 11  mode              89741 non -null  int64  
+ 12  speechiness       89741 non -null  float64
+ 13  acousticness      89741 non -null  float64
+ 14  instrumentalness  89741 non -null  float64
+ 15  liveness          89741 non -null  float64
+ 16  valence           89741 non -null  float64
+ 17  tempo             89741 non -null  float64
+ 18  time_signature    89741 non -null  int64  
+ 19  track_genre       89741 non -null  object 
+ 20  duration_min      89741 non -null  float64
+dtypes: float64(11), int64(5), object(5)
+memory usage: 14.4+ MB
+\end{verbatim}
+
+\section{Transposed Statistical Summary of Numeric Columns}
+
+\begin{verbatim}
+df.describe().T
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}p{\dimexpr 0.111\linewidth-2\tabcolsep}}
+\toprule
+ & count & mean & std & min & 25\% & 50\% & 75\% & max \\
+\hline
+popularity & 89741.0 & 33.198438 & 20.580824 & 0.000 & 19.0000 & 33.000000 & 49.000000 & 1.000000e+02 \\
+\hline
+duration\_ms & 89741.0 & 229141.812182 & 112947.741190 & 0.000 & 173040.0000 & 213293.000000 & 264293.000000 & 5.237295e+06 \\
+\hline
+explicit & 0.0 & NaN & NaN & NaN & NaN & NaN & NaN & NaN \\
+\hline
+danceability & 89741.0 & 0.562166 & 0.176691 & 0.000 & 0.4500 & 0.576000 & 0.692000 & 9.850000e-01 \\
+\hline
+energy & 89741.0 & 0.634458 & 0.256605 & 0.000 & 0.4570 & 0.676000 & 0.853000 & 1.000000e+00 \\
+\hline
+key & 89741.0 & 5.283549 & 3.559897 & 0.000 & 2.0000 & 5.000000 & 8.000000 & 1.100000e+01 \\
+\hline
+loudness & 89741.0 & -8.499004 & 5.221490 & -49.531 & -10.3220 & -7.185000 & -5.108000 & 4.532000e+00 \\
+\hline
+mode & 89741.0 & 0.636966 & 0.480877 & 0.000 & 0.0000 & 1.000000 & 1.000000 & 1.000000e+00 \\
+\hline
+speechiness & 89741.0 & 0.087442 & 0.113277 & 0.000 & 0.0360 & 0.048900 & 0.085900 & 9.650000e-01 \\
+\hline
+acousticness & 89741.0 & 0.328289 & 0.338321 & 0.000 & 0.0171 & 0.188000 & 0.625000 & 9.960000e-01 \\
+\hline
+instrumentalness & 89741.0 & 0.173413 & 0.323848 & 0.000 & 0.0000 & 0.000058 & 0.097600 & 1.000000e+00 \\
+\hline
+liveness & 89741.0 & 0.216970 & 0.194884 & 0.000 & 0.0982 & 0.132000 & 0.279000 & 1.000000e+00 \\
+\hline
+valence & 89741.0 & 0.469477 & 0.262864 & 0.000 & 0.2490 & 0.457000 & 0.682000 & 9.950000e-01 \\
+\hline
+tempo & 89741.0 & 122.058316 & 30.117532 & 0.000 & 99.2640 & 122.013000 & 140.077000 & 2.433720e+02 \\
+\hline
+time\_signature & 89741.0 & 3.897427 & 0.453435 & 0.000 & 4.0000 & 4.000000 & 4.000000 & 5.000000e+00 \\
+\hline
+duration\_min & 89741.0 & 3.819030 & 1.882462 & 0.000 & 2.8840 & 3.554883 & 4.404883 & 8.728825e+01 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+\section{Categorical Summary}
+
+\begin{verbatim}
+df.describe(include="object").T
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}}
+\toprule
+ & count & unique & top & freq \\
+\hline
+track\_id & 89741 & 89741 & 2hETkH7cOfqmz3LqZDHZf5 & 1 \\
+\hline
+artists & 89740 & 31437 & George Jones & 260 \\
+\hline
+album\_name & 89740 & 46589 & The Complete Hank Williams & 110 \\
+\hline
+track\_name & 89740 & 73608 & Rockin' Around The Christmas Tree & 48 \\
+\hline
+track\_genre & 89741 & 113 & acoustic & 1000 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+\textbf{Interpretation}
+
+\textbf{track\_id}: All unique (as expected)\newline
+\textbf{artists}: 31k unique; most frequent = George Jones (260 tracks)\newline
+\textbf{track\_name}: 73k unique titles\newline
+\textbf{track\_genre}: 113 genres; most frequent = acoustic (1000 tracks)
+
+\section{Missing values summary}
+
+\begin{verbatim}
+df.isna().sum()
+\end{verbatim}
+
+\begin{verbatim}
+track_id                0
+artists                 1
+album_name              1
+track_name              1
+popularity              0
+duration_ms             0
+explicit            89741
+danceability            0
+energy                  0
+key                     0
+loudness                0
+mode                    0
+speechiness             0
+acousticness            0
+instrumentalness        0
+liveness                0
+valence                 0
+tempo                   0
+time_signature          0
+track_genre             0
+duration_min            0
+dtype: int64
+\end{verbatim}
+
+\textbf{Interpretation}
+
+\begin{itemize}
+\item artists, album\_name, track\_name: 1 missing value each
+\item explicit: All missing (excluded from final dataset)
+\item We can ignore this because we are only quantitative features
+\end{itemize}
+
+First, let's plot a histogram to show the frequency distribution of the prices:
+
+\begin{verbatim}
+sns.histplot(df["popularity"], bins=30, kde=True)
+plt.title("Popularity Distribution")
+plt.xlabel("Popularity")
+plt.tight_layout()
+plt.savefig('figures/popularity_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/50da83cbf3514b3a8222d9a13506e32d.png}
+
+\textbf{Interpretation}
+
+\begin{itemize}
+\item Popularity is right-skewed
+\item Most songs have low popularity, with small peaks around 20--50
+\item Very few songs are extremely popular (\textgreater 80)
+\end{itemize}
+
+\section{More Features}
+
+Let's look at more features we'll be using in our models.
+
+\begin{verbatim}
+sns.histplot(df["danceability"], bins=30, kde=True)
+plt.title("Danceability Distribution")
+plt.xlabel("Danceability")
+plt.tight_layout()
+plt.savefig('figures/dance_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/345172b5089d1bff391b6d76f97e4e8f.png}
+
+We can see danceability follows a fairly normal distribution with mean around 0.6
+
+\begin{verbatim}
+sns.histplot(df["energy"], bins=30, kde=True)
+plt.title("Energy Distribution")
+plt.xlabel("Energy")
+plt.tight_layout()
+plt.savefig('figures/energy_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/6e895c6286502e81c28d45c00db6c440.png}
+
+\begin{verbatim}
+sns.histplot(df["acousticness"], bins=30, kde=True)
+plt.title("Acousticness Distribution")
+plt.xlabel("Acousticness")
+plt.tight_layout()
+plt.savefig('figures/acoustic_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/8424df175eff39ff949b66ef21ff2527.png}
+
+Acousticness is heavily skewed \rightarrow most songs are NOT acoustic.
+
+\begin{verbatim}
+sns.histplot(df["valence"], bins=30, kde=True)
+plt.title("Valence Distribution")
+plt.xlabel("Valence")
+plt.tight_layout()
+plt.savefig('figures/valence_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/64001e66956dac5d5338c30be2be57f1.png}
+
+The Valence is fairly uniform --- songs range from sad to happy evenly.
+
+\begin{verbatim}
+sns.histplot(df["loudness"], bins=30, kde=True)
+plt.title("Loudness Distribution")
+plt.xlabel("Loudness")
+plt.tight_layout()
+plt.savefig('figures/loudness_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/b090aea98bffc8a6abc00a6d80b536b3.png}
+
+Songs volume is normally distributed around -8 dB.
+
+\begin{verbatim}
+sns.histplot(df["speechiness"], bins=30, kde=True)
+plt.title("Speechiness Distribution")
+plt.xlabel("Speechiness")
+plt.tight_layout()
+plt.savefig('figures/speech_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/e3ada5f4d4fcf92e6f234c905ec97e63.png}
+
+Most songs have mostly low speechiness\rightarrow not spoken word.
+
+\begin{verbatim}
+sns.histplot(df["tempo"], bins=30, kde=True)
+plt.title("Tempo Distribution")
+plt.xlabel("Tempo")
+plt.tight_layout()
+plt.savefig('figures/tempo_distribution.png', bbox_inches='tight')
+plt.show()
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/6e490ae0e5bda73a84fea51caeb23869.png}
+
+The majority of tempos range from 100--140 BPM.
+
+\section{Calculate correlation of all numeric features with popularity, sorted by strength (positive to negative).}
+
+\begin{verbatim}
+# Calculate correlation only for numeric columns
+corr = df.select_dtypes(include=[np.number]).corr()
+corr["popularity"].sort_values(ascending=False)
+corr.to_csv("results/full_correlation_matrix.csv")
+\end{verbatim}
+
+\textbf{Interpretation}
+
+\begin{itemize}
+\item No audio feature strongly predicts popularity
+\item Loudness has the highest positive correlation (still small)
+\item Instrumentalness has the highest negative correlation \rightarrow instrumental songs tend to be less popular
+\item Popularity is likely influenced by external factors (artists, marketing, playlist placement, etc.)
+\end{itemize}
+
+
+\end{document}

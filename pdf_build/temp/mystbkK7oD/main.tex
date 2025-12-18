@@ -1,0 +1,482 @@
+% Created with jtex v.1.0.20
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{datetime}
+\usepackage{graphicx}
+\usepackage{natbib}
+\bibliographystyle{abbrvnat}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%  imports  %%%%%%%%%%%%%%%%%%%
+\usepackage{booktabs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% colors for hyperlinks
+\hypersetup{colorlinks=true, allcolors=blue}
+
+\newcommand{\logo}{
+  \href{https://curvenote.com}{\includegraphics[width=2cm]{curvenote.png}}
+}
+
+\title{Stat 159 Final Project - Predicting Spotify Track Popularity from Audio Features}
+
+\author{Collins Tse \and Jacky Ke \and Rebecca Bachtra \and Christy Yau}
+
+\newdate{articleDate}{18}{12}{2025}
+\date{\displaydate{articleDate}}
+
+\begin{document}
+\maketitle
+\begin{abstract}We study whether a track's quantitative audio features from Spotify (e.g., danceability, energy, loudness, acousticness, valence) can predict Spotify's popularity score (0--100). After cleaning and sampling, our analysis uses 114,000 tracks. Popularity is broadly distributed (mean 33.24, median 35, IQR [17, 50]). Multiple linear regression provides an interpretable baseline, and we compare it against Ridge and LASSO regularization. All three linear models perform similarly, while the best test RMSE is 20.03 popularity points. Correlations between individual audio features and popularity are weak. Multicollinearity is present but modest, largest VIF among predictors is 4.26 for energy. Overall, audio features capture some signal but leave substantial variation unexplained, motivating richer nonlinear models and/or additional contextual covariates.\end{abstract}\begin{center}\logo\end{center}
+
+
+\textbf{Group 22}
+
+\section{1. Introduction}
+
+Spotify provides a popularity score intended to summarize a track's overall consumption and engagement on the platform. A natural question is whether we can explain, or even predict this popularity using only the track's audio features derived from Spotify's Web API.
+
+\textbf{Research question:}
+
+Can we predict a song's Spotify popularity score from quantitative audio features such as danceability, energy, loudness, acousticness, and valence?\newline
+We focus on an interpretable baseline: multiple linear regression, with Ridge/LASSO as comparisons.
+
+\section{2. Data}
+
+We use the Spotify Tracks Dataset from Kaggle, curated from the Spotify Web API and spanning tracks from 1921--2020. The dataset includes numerical audio descriptors (e.g., danceability, energy, loudness, tempo, valence) and the target variable \texttt{popularity}.
+
+\subsection{Data handling and reproducibility}
+
+\begin{itemize}
+\item Raw and cleaned Spofity dataset CSVs are stored under \texttt{data/}.
+\item EDA plots are written to \texttt{figures/}.
+\item Modeling outputs (summary tables, diagnostics, correlation matrix) are written to \texttt{results/}.
+\end{itemize}
+
+Because large raw datasets can be inconvenient to version-control directly, our workflow emphasizes reproducible scripts + exported results rather than rerunning heavy computations inside this notebook.
+
+\begin{verbatim}
+from pathlib import Path
+import pandas as pd
+import numpy as np
+from IPython.display import Image, display, Markdown
+
+ROOT = Path(".")
+FIG_DIR = ROOT / "figures"
+RES_DIR = ROOT / "results"
+
+def show_fig(filename: str, caption: str, width: int = 900):
+    path = FIG_DIR / filename
+    if not path.exists():
+        display(Markdown(f"**Missing figure:** `{path}`"))
+        return
+    display(Image(filename=str(path), width=width))
+    display(Markdown(f"*Figure: {caption}*"))
+
+def load_csv(filename: str) -> pd.DataFrame:
+    path = RES_DIR / filename
+    if not path.exists():
+        raise FileNotFoundError(f"Missing required file: {path}")
+    return pd.read_csv(path)
+\end{verbatim}
+
+\section{3. Exploratory Data Analysis}
+
+Our group begin by inspecting the distribution of popularity and core audio features. These plots summarizes the cleaned/sampled dataset, and help us anticipate modeling challenges.
+
+\begin{verbatim}
+popularity_summary = load_csv("popularity_summary.csv")
+
+if "stat" in popularity_summary.columns:
+    popularity_summary = popularity_summary.set_index("stat")
+elif "Unnamed: 0" in popularity_summary.columns:
+    popularity_summary = popularity_summary.rename(columns={"Unnamed: 0": "stat"}).set_index("stat")
+else:
+    popularity_summary = popularity_summary.set_index(popularity_summary.columns[0])
+
+popularity_summary = popularity_summary.loc[:, ~popularity_summary.columns.str.startswith("Unnamed")]
+
+if "popularity" in popularity_summary.columns:
+    popularity_summary = popularity_summary.rename(columns={"popularity": "value"})
+
+display(popularity_summary)
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.500\linewidth-2\tabcolsep}p{\dimexpr 0.500\linewidth-2\tabcolsep}}
+\toprule
+ & value \\
+\hline
+stat &  \\
+\hline
+count & 114000.000000 \\
+\hline
+mean & 33.238535 \\
+\hline
+std & 22.305078 \\
+\hline
+min & 0.000000 \\
+\hline
+25\% & 17.000000 \\
+\hline
+50\% & 35.000000 \\
+\hline
+75\% & 50.000000 \\
+\hline
+max & 100.000000 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+The popularity score ranges from 0 to 100, with mean 33.24 and median 35. The middle 50\% of tracks lie between 17 and 50, indicating substantial spread in popularity.
+
+\begin{verbatim}
+show_fig("popularity_distribution.png", "Distribution of Spotify popularity. The distribution is wide, with substantial mass at low popularity and a long right tail toward highly popular tracks.")
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/50da83cbf3514b3a8222d9a13506e32d.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\subsection{Audio feature distributions}
+
+Below are histograms for several audio features used in our models.
+
+\begin{verbatim}
+show_fig("dance_distribution.png", "Danceability is approximately unimodal, with many tracks concentrated around mid -to -high values.")
+show_fig("energy_distribution.png", "Energy skews high: many tracks in the cleaned sample have relatively high energy.")
+show_fig("loudness_distribution.png", "Loudness (dB) is concentrated around a typical modern loudness range with a long left tail to very quiet tracks.")
+show_fig("acoustic_distribution.png", "Acousticness shows strong concentration near 0 (non -acoustic tracks), with a secondary mass toward higher acousticness.")
+show_fig("speech_distribution.png", "Speechiness is strongly right -skewed, with most tracks near 0 and a small fraction with high speech content.")
+show_fig("tempo_distribution.png", "Tempo is multi -modal, with common tempos around typical pop/rock ranges and additional smaller modes at higher tempos.")
+show_fig("valence_distribution.png", "Valence (musical positivity) is broadly distributed across the 0–1 range, with slightly more mass in mid values.")
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/345172b5089d1bff391b6d76f97e4e8f.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/6e895c6286502e81c28d45c00db6c440.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/b090aea98bffc8a6abc00a6d80b536b3.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/8424df175eff39ff949b66ef21ff2527.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/e3ada5f4d4fcf92e6f234c905ec97e63.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/6e490ae0e5bda73a84fea51caeb23869.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\includegraphics[width=0.7\linewidth]{files/64001e66956dac5d5338c30be2be57f1.png}
+
+\begin{verbatim}
+<IPython.core.display.Markdown object>
+\end{verbatim}
+
+\section{4. Correlation structure}
+
+To understand which variables move together---and to anticipate multicollinearity in regression---we examine the correlation matrix exported from our analysis pipeline.
+
+\begin{verbatim}
+corr = pd.read_csv(RES_DIR / "full_correlation_matrix.csv", index_col=0)
+corr = corr.apply(pd.to_numeric, errors="coerce")
+display(corr.iloc[:6, :6])
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}p{\dimexpr 0.143\linewidth-2\tabcolsep}}
+\toprule
+ & popularity & duration\_ms & explicit & danceability & energy & key \\
+\hline
+popularity & 1.000000 & -0.023119 & NaN & 0.064281 & 0.013728 & 0.003432 \\
+\hline
+duration\_ms & -0.023119 & 1.000000 & NaN & -0.064130 & 0.063261 & 0.011286 \\
+\hline
+explicit & NaN & NaN & NaN & NaN & NaN & NaN \\
+\hline
+danceability & 0.064281 & -0.064130 & NaN & 1.000000 & 0.143914 & 0.035114 \\
+\hline
+energy & 0.013728 & 0.063261 & NaN & 0.143914 & 1.000000 & 0.046334 \\
+\hline
+key & 0.003432 & 0.011286 & NaN & 0.035114 & 0.046334 & 1.000000 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+\begin{verbatim}
+pop_corr = corr["popularity"].drop(labels=["popularity"]).dropna().sort_values(key=lambda s: s.abs(), ascending=False)
+display(pop_corr.head(10).to_frame(name="corr_with_popularity"))
+
+cols = corr.columns.tolist()
+pairs = []
+for i in range(len(cols)):
+    for j in range(i + 1, len(cols)):
+        a, b = cols[i], cols[j]
+        r = corr.loc[a, b]
+        if pd.isna(r):
+            continue
+        if a == "popularity" or b == "popularity":
+            continue
+        if set([a, b]) == set(["duration_ms", "duration_min"]):
+            continue
+        pairs.append((abs(float(r)), float(r), a, b))
+
+top_pairs = (pd.DataFrame(sorted(pairs, reverse=True)[:10], columns=["abs_r", "r", "feature_1", "feature_2"]))
+display(top_pairs)
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.500\linewidth-2\tabcolsep}p{\dimexpr 0.500\linewidth-2\tabcolsep}}
+\toprule
+ & corr\_with\_popularity \\
+\hline
+instrumentalness & -0.127465 \\
+\hline
+loudness & 0.071676 \\
+\hline
+danceability & 0.064281 \\
+\hline
+speechiness & -0.047081 \\
+\hline
+acousticness & -0.038847 \\
+\hline
+time\_signature & 0.036893 \\
+\hline
+duration\_min & -0.023119 \\
+\hline
+duration\_ms & -0.023119 \\
+\hline
+mode & -0.016214 \\
+\hline
+liveness & -0.013844 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}}
+\toprule
+ & abs\_r & r & feature\_1 & feature\_2 \\
+\hline
+0 & 0.758774 & 0.758774 & energy & loudness \\
+\hline
+1 & 0.732566 & -0.732566 & energy & acousticness \\
+\hline
+2 & 0.582663 & -0.582663 & loudness & acousticness \\
+\hline
+3 & 0.492571 & 0.492571 & danceability & valence \\
+\hline
+4 & 0.434717 & -0.434717 & loudness & instrumentalness \\
+\hline
+5 & 0.330759 & -0.330759 & instrumentalness & valence \\
+\hline
+6 & 0.289091 & 0.289091 & loudness & valence \\
+\hline
+7 & 0.271839 & 0.271839 & danceability & loudness \\
+\hline
+8 & 0.258628 & 0.258628 & energy & tempo \\
+\hline
+9 & 0.256313 & 0.256313 & energy & valence \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+\subsection{Strongest feature--feature correlations (by absolute value)}
+
+Excluding the engineered duplicate (\texttt{duration\_ms} vs \texttt{duration\_min}), the strongest relationships are:
+
+\begin{itemize}
+\item energy vs loudness: r = +0.759
+\item energy vs acousticness: r = -0.733
+\item loudness vs acousticness: r = -0.583
+\item danceability vs valence: r = +0.493
+\item loudness vs instrumentalness: r = -0.435
+\end{itemize}
+
+These patterns are consistent with musical intuition: tracks with higher energy tend to be louder, and more acoustic tracks tend to have lower energy and loudness.
+
+\subsection{Correlations with popularity}
+
+Correlations between individual audio features and popularity are generally small in magnitude:
+
+\begin{itemize}
+\item instrumentalness: r = -0.127
+\item loudness: r = +0.072
+\item danceability: r = +0.064
+\item speechiness: r = -0.047
+\item acousticness: r = -0.039
+\end{itemize}
+
+The largest (in absolute value) is instrumentalness (negative correlation), suggesting that tracks with more instrumental content tend to be less popular on average in this sample. However, the overall weakness of these correlations signals that linear prediction from audio features alone may be challenging.
+
+\section{5. Predictive modeling}
+
+We fit a multiple linear regression model to predict popularity from audio features, and compare it to two standard regularized variants:
+
+\begin{itemize}
+\item Ridge regression (L2 penalty)
+\item LASSO regression (L1 penalty)
+\end{itemize}
+
+Model fitting, splitting, and cross-validation are performed in separate notebooks; here we only load the exported results. We use RMSE on the same 0--100 popularity scale for evaluation.
+
+\begin{verbatim}
+mlr_models = load_csv("mlr_models_comparison.csv")
+mlr_models = mlr_models.drop(columns=[c for c in mlr_models.columns if c.startswith("Unnamed")], errors="ignore")
+display(mlr_models)
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}p{\dimexpr 0.200\linewidth-2\tabcolsep}}
+\toprule
+ & Model & Train RMSE & Test RMSE & CV Error \\
+\hline
+0 & Multiple Linear Reg & 20.278961 & 20.032047 & 20.031338 \\
+\hline
+1 & + Ridge & 20.278963 & 20.031911 & 20.030885 \\
+\hline
+2 & + LASSO & 20.278982 & 20.032112 & 20.031258 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+Across these linear approaches, performance is extremely similar. The best is + Ridge, with test RMSE = 20.03, CV error $\approx$ 20.03.\newline
+An RMSE near 20 means on average the model's predictions deviate from true popularity by about 20 points, which is sizable relative to the full 0--100 range.
+
+\section{6. Multicollinearity diagnostics (VIF)}
+
+Because regression coefficient interpretation can be unstable when predictors are highly collinear, we compute VIF for the regression predictors. A common rule of thumb is that VIF values above {\textasciitilde}5 (or 10) indicate concerning multicollinearity.
+
+\begin{verbatim}
+vif = load_csv("regression_vif.csv")
+vif = vif.drop(columns=[c for c in vif.columns if c.startswith("Unnamed")], errors="ignore")
+display(vif.sort_values("VIF", ascending=False))
+\end{verbatim}
+
+\bigskip\noindent
+\begin{tabular}{p{\dimexpr 0.333\linewidth-2\tabcolsep}p{\dimexpr 0.333\linewidth-2\tabcolsep}p{\dimexpr 0.333\linewidth-2\tabcolsep}}
+\toprule
+ & feature & VIF \\
+\hline
+0 & const & 170.662614 \\
+\hline
+2 & energy & 4.261457 \\
+\hline
+4 & loudness & 3.269276 \\
+\hline
+7 & acousticness & 2.417361 \\
+\hline
+10 & valence & 1.600743 \\
+\hline
+1 & danceability & 1.565985 \\
+\hline
+8 & instrumentalness & 1.470513 \\
+\hline
+9 & liveness & 1.158525 \\
+\hline
+6 & speechiness & 1.146349 \\
+\hline
+11 & tempo & 1.096353 \\
+\hline
+12 & time\_signature & 1.082554 \\
+\hline
+13 & duration\_min & 1.052097 \\
+\hline
+5 & mode & 1.041646 \\
+\hline
+3 & key & 1.022827 \\
+\hline
+\bottomrule
+\end{tabular}
+
+\bigskip
+
+Excluding the intercept term, the largest VIF values are:
+
+\begin{itemize}
+\item energy: VIF = 4.26
+\item loudness: VIF = 3.27
+\item acousticness: VIF = 2.42
+\end{itemize}
+
+All are below 5, indicating moderate but not severe multicollinearity. The elevated VIFs for energy and loudness align with the strong pairwise correlations observed earlier.
+
+\section{7. Discussion}
+
+Our results highlight both what audio-feature modeling can and cannot do:
+
+\begin{itemize}
+\item Audio features alone explain limited variation in Spotify popularity. The weak correlations with popularity and RMSE $\approx$ 20 suggest that platform-level and social factors likely dominate.
+\item Collinearity is present but manageable for linear modeling in this feature set (VIF \textless  5), especially if our goal is prediction rather than fine-grained causal interpretation.
+\item Popularity is a proprietary metric. Spotify's popularity score is not a direct measure of ``cultural impact'' and may reflect platform-specific dynamics such as playlisting, recency effects, and algorithmic exposure.
+\end{itemize}
+
+\subsection{Limitations and future work}
+
+\begin{itemize}
+\item Incorporate nonlinear models (e.g., random forests, gradient boosting/XGBoost) and compare performance and feature importance.
+\item Add time-aware evaluation (e.g., train on earlier years, test on later years) to study how relationships shift across musical eras.
+\item Include additional predictors (artist-level popularity, release year, genre) if available and allowed by the project scope.
+\end{itemize}
+
+\section{8. Conclusion}
+
+\begin{itemize}
+\item Popularity in this dataset is widely dispersed (mean $\approx$ 33, median $\approx$ 35), with many tracks at low popularity.
+\item Several audio features are strongly related to each other (energy--loudness, energy--acousticness), but individual correlations with popularity are weak.
+\item Linear models provide a clear baseline but achieve only moderate predictive accuracy (test RMSE $\approx$ 20), implying that much of popularity is not captured by audio descriptors alone.
+\end{itemize}
+
+\section{9. Author Contributions}
+
+Collin:
+
+Becca:
+
+Jacky:
+main.ipynb
+
+Christy:
+02\_linear\_regression.ipynb skeleton
+Myst website
+
+\section{References}
+
+We use the Spotify Tracks Dataset from Kaggle for audio features and the Spotify popularity score[]\{cite:p spotifytracks\_kaggle\}.
+
+
+\end{document}
