@@ -21,3 +21,5 @@ Dataset source:
 
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/UCB-stat-159-f25/final-group22/main)
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17971887.svg)](https://doi.org/10.5281/zenodo.17971887)
