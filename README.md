@@ -6,6 +6,7 @@ Our repository contains the following files:
 - data/: folder containing spotify data (raw and cleaned)
 - figures/: folder containing visualizations (figures)
 - results/: folder containing data results (data tables)
+- utils/: folder with functions and pytest 
 - clean_spotify.ipynb: notebook for cleaning spotify data
 - EDA.ipynb: notebook for performing EDA
 - linear_regression.ipynb: notebook for creating linear regression model
